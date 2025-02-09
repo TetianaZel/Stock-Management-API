@@ -40,6 +40,8 @@ public class OrderItem
     public int OrderId { get; set; }
     public int ProductId { get; set; }
     public int Quantity { get; set; }
+    public Order Order { get; set; }
+    public Product Product { get; set; }
 }
 
 public class PurchaseOrder
@@ -50,6 +52,7 @@ public class PurchaseOrder
     public DateTime? ExpectedDeliveryDate { get; set; }
     public DateTime? ActualDeliveryDate { get; set; }
     public OrderStatus Status { get; set; }
+    public Order Order { get; set; }
 }
 
 public class StockResponseDto
