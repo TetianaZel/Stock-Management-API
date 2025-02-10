@@ -25,34 +25,31 @@ public class Product
 {
     public int ProductId { get; set; }
     public string SKU { get; set; }
+    public string Description { get; set; }
+    public decimal Price { get; set; }
     public int StockQuantity { get; set; }
-}
-
-public class Order
-{
-    public int OrderId { get; set; }
-    public DateTime CreatedDate { get; set; }
-    public List<OrderItem> Items { get; set; }
-}
-
-public class OrderItem
-{
-    public int OrderId { get; set; }
-    public int ProductId { get; set; }
-    public int Quantity { get; set; }
-    public Order Order { get; set; }
-    public Product Product { get; set; }
+    public List<ProductPurchaseOrder> ProductPurchaseOrders { get; set; }
 }
 
 public class PurchaseOrder
 {
     public int PurchaseOrderId { get; set; }
-    public int OrderId { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime? ExpectedDeliveryDate { get; set; }
     public DateTime? ActualDeliveryDate { get; set; }
     public OrderStatus Status { get; set; }
-    public Order Order { get; set; }
+    public decimal TotalAmount { get; set; }
+    public List<ProductPurchaseOrder> ProductPurchaseOrders { get; set; }
+}
+
+public class ProductPurchaseOrder
+{
+    public int ProductId { get; set; }
+    public int PurchaseOrderId { get; set; }
+    public int Quantity { get; set; }
+    public decimal Subtotal { get; set; }
+    public Product Product { get; set; }
+    public PurchaseOrder PurchaseOrder { get; set; }
 }
 
 public class StockResponseDto
@@ -154,68 +151,31 @@ HTTP/1.1 401 Unauthorized
 ```
 
 ## Database Schema and Queries
-### SQL Table Definitions with Indexing
-```sql
-CREATE TABLE Products (
-    ProductId INT IDENTITY(1,1) PRIMARY KEY,
-    SKU NVARCHAR(50) UNIQUE NOT NULL,
-    StockQuantity INT NOT NULL
-);
 
-CREATE TABLE Orders (
-    OrderId INT IDENTITY(1,1) PRIMARY KEY,
-    CreatedDate DATETIME NOT NULL
-);
 
-CREATE TABLE OrderItems (
-    OrderId INT NOT NULL,
-    ProductId INT NOT NULL,
-    Quantity INT NOT NULL,
-    PRIMARY KEY (OrderId, ProductId),
-    FOREIGN KEY (OrderId) REFERENCES Orders(OrderId),
-    FOREIGN KEY (ProductId) REFERENCES Products(ProductId)
-);
+![image](https://github.com/user-attachments/assets/83d25433-a79c-40ca-a054-7f6c2d835d2e)
 
-CREATE TABLE PurchaseOrders (
-    PurchaseOrderId INT IDENTITY(1,1) PRIMARY KEY,
-    OrderId INT NOT NULL,
-    CreatedDate DATETIME NOT NULL,
-    ExpectedDeliveryDate DATETIME NULL,
-    ActualDeliveryDate DATETIME NULL,
-    Status NVARCHAR(20) NOT NULL,
-    FOREIGN KEY (OrderId) REFERENCES Orders(OrderId),
-    INDEX idx_order_expected_delivery (OrderId, ExpectedDeliveryDate)
-);
-```
 
 ### Query to Fetch a Specific Product's Stock
 ```sql
-SELECT
-    p.SKU,
-    p.StockQuantity,
-    MIN(po.ExpectedDeliveryDate) AS ExpectedDeliveryDate
-FROM Products p
-LEFT JOIN OrderItems oi ON p.ProductId = oi.ProductId
-LEFT JOIN Orders o ON oi.OrderId = o.OrderId
-LEFT JOIN PurchaseOrders po ON o.OrderId = po.OrderId
-WHERE p.SKU = '098765qwerty'
-AND (po.ExpectedDeliveryDate IS NULL OR po.ExpectedDeliveryDate >= GETDATE())
+SELECT p.SKU, p.StockQuantity, MIN(po.ExpectedDeliveryDate) AS ExpectedDeliveryDate
+FROM Product p
+LEFT JOIN ProductPurchaseOrder ppo ON p.ProductId = ppo.ProductId
+LEFT JOIN PurchaseOrder po ON ppo.PurchaseOrderId = po.PurchaseOrderId
+WHERE p.SKU = @SKU
 AND po.Status IN ('Confirmed', 'PendingDelivery')
-GROUP BY p.SKU, p.StockQuantity;
+AND po.ExpectedDeliveryDate >= GETDATE()
+GROUP BY p.SKU, p.StockQuantity
 ```
 
 ### Query to Fetch Full Stock List
 ```sql
-SELECT 
-    p.SKU, 
-    p.StockQuantity, 
-    MIN(po.ExpectedDeliveryDate) AS ExpectedDeliveryDate
-FROM Products p
-LEFT JOIN OrderItems oi ON p.ProductId = oi.ProductId
-LEFT JOIN Orders o ON oi.OrderId = o.OrderId
-LEFT JOIN PurchaseOrders po ON o.OrderId = po.OrderId
+SELECT p.SKU, p.StockQuantity, MIN(po.ExpectedDeliveryDate) AS ExpectedDeliveryDate
+FROM Product p
+LEFT JOIN ProductPurchaseOrder ppo ON p.ProductId = ppo.ProductId
+LEFT JOIN PurchaseOrder po ON ppo.PurchaseOrderId = po.PurchaseOrderId
 WHERE po.Status IN ('Confirmed', 'PendingDelivery')
-AND (po.ExpectedDeliveryDate IS NULL OR po.ExpectedDeliveryDate >= GETDATE())
+AND po.ExpectedDeliveryDate >= GETDATE()
 GROUP BY p.SKU, p.StockQuantity
 ORDER BY p.StockQuantity DESC;
 
